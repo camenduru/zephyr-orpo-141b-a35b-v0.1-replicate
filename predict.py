@@ -108,7 +108,7 @@ class VLLMPipeline:
             generation_length = len(generated_text)
 
 class Predictor(BasePredictor):
-    def setup(self) -> None:
+    async def setup(self) -> None:
         n_gpus = torch.cuda.device_count()
         start = time.time()
         print(f"downloading weights took {time.time() - start:.3f}s")
