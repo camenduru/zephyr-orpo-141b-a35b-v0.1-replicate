@@ -8,7 +8,7 @@ from vllm.engine.arg_utils import AsyncEngineArgs
 from vllm.sampling_params import SamplingParams
 from vllm.utils import random_uuid
 
-# https://github.com/technillogue/cog-vllm/blob/main/predict.py modified
+# https://github.com/nateraw/replicate-examples/blob/main/mixtral-vllm/predict.py modified
 class VLLMPipeline:
     """
     A simplified inference engine that runs inference w/ vLLM
@@ -32,7 +32,7 @@ class VLLMPipeline:
         async for generated_text in results_generator:
             yield generated_text
 
-    async def __call__(
+    def __call__(
         self,
         prompt: str,
         max_tokens: int,
@@ -96,19 +96,34 @@ class VLLMPipeline:
                                         logits_processors=None
         )
 
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        gen = self.generate_stream(
+            prompt,
+            sampling_params,
+        )
+
         generation_length = 0
 
-        async for request_output in self.generate_stream(prompt, sampling_params):
-            assert len(request_output.outputs) == 1
-            generated_text = request_output.outputs[0].text
-            if incremental_generation:
-                yield generated_text[generation_length:]
-            else:
-                yield generated_text
-            generation_length = len(generated_text)
+        while True:
+            try:
+                request_output = loop.run_until_complete(gen.__anext__())
+                assert len(request_output.outputs) == 1
+                generated_text = request_output.outputs[0].text
+                if incremental_generation:
+                    yield generated_text[generation_length:]
+                else:
+                    yield generated_text
+                generation_length = len(generated_text)
+            except StopAsyncIteration:
+                break
 
 class Predictor(BasePredictor):
-    async def setup(self) -> None:
+    def setup(self) -> None:
         n_gpus = torch.cuda.device_count()
         start = time.time()
         print(f"downloading weights took {time.time() - start:.3f}s")
@@ -122,7 +137,7 @@ class Predictor(BasePredictor):
             disable_log_requests=True,
             dtype="auto",
         )
-    async def predict(
+    def predict(
         self,
         prompt: str = Input("Tell me a story about the Cheesecake Kingdom."),
         max_tokens: int = Input(default=256, description="Maximum number of tokens to generate per output sequence."),
@@ -171,7 +186,7 @@ class Predictor(BasePredictor):
                             min_p=min_p,
                             ignore_eos=ignore_eos,
                             )
-        async for text in generate:
+        for text in generate:
             yield text
         print(prompt_text)
         print(f"Duration: {time.time() - start:.3f}s")
