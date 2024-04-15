@@ -18,8 +18,8 @@ class VLLMPipeline:
         args = AsyncEngineArgs(*args, **kwargs)
         self.engine = AsyncLLMEngine.from_engine_args(args)
         self.tokenizer = (
-            self.engine.engine.tokenizer.tokenizer 
-            if hasattr(self.engine.engine.tokenizer, "tokenizer") 
+            self.engine.engine.tokenizer.tokenizer
+            if hasattr(self.engine.engine.tokenizer, "tokenizer")
             else self.engine.engine.tokenizer
         )
 
